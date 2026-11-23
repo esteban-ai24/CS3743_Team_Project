@@ -51,7 +51,7 @@ CREATE TABLE events (
 -- Subtype table for community events stores host name and host type
 CREATE TABLE community_events(
 	event_id INT PRIMARY KEY,
-	community_host_type VARCHAR(50) NOT NULL CHECK (community_host_type IN (‘Person’, ‘Organization’)),
+	community_host_type VARCHAR(50) NOT NULL CHECK (community_host_type IN ('Person', 'Organization')),
 	community_host_name VARCHAR(150) NOT NULL,
 	CONSTRAINT fk_community_event
 		FOREIGN KEY (event_id) REFERENCES events(event_id)
