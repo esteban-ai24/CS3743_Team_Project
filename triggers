@@ -1,0 +1,18 @@
+
+-- triggers to add id's to table, before a school/event is deleted in the shared key it should be updated with letter O for out of buissness as event still happend under them 
+DELIMITER //
+CREATE TRIGGER trg_school_insert_id
+	AFTER INSERT ON school
+    FOR EACH ROW 
+BEGIN 
+	CALL proc_add_host_id_host_types(NEW.id_school,'S');
+ END //
+ DELIMITER ;
+DELIMITER //
+CREATE TRIGGER trg_community_insert_id
+	AFTER INSERT ON community
+    FOR EACH ROW 
+BEGIN 
+	CALL proc_add_host_id_host_types(NEW.id_community,'C');
+ END //
+ DELIMITER ;
