@@ -1,0 +1,22 @@
+
+-- adding function to derive sale prices
+-- PROCEDURES add children to lookup table
+DELIMITER //
+CREATE PROCEDURE proc_add_host_id_host_types (IN in_host_id INT,
+IN in_host_types VARCHAR(1))
+BEGIN
+IF NOT((((SELECT COUNT(*) FROM school WHERE id_school = in_host_id) = 1) AND (in_host_types = 'S') OR 
+(SELECT COUNT(*) FROM community WHERE id_community = in_host_id) = 1) AND (in_host_types = 'C')) THEN
+	SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'Not valid pairing';
+END IF;
+IF(((SELECT COUNT(*) FROM school WHERE id_school = in_host_id) = 1) AND (in_host_types = 'S') ) THEN
+INSERT INTO host_type (host_id, host_types)
+VALUES (in_host_id, in_host_types);
+END IF;
+IF(((SELECT COUNT(*) FROM community WHERE id_community = in_host_id) = 1) AND (in_host_types = 'C') ) THEN
+INSERT INTO host_type (host_id, host_types)
+VALUES (in_host_id, in_host_types);
+END IF;
+END //
+DELIMITER ;
