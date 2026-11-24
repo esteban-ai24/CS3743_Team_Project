@@ -1,0 +1,89 @@
+-- create database + safety check
+DROP DATABASE IF EXISTS bm_bakery_db;
+CREATE DATABASE IF NOT EXISTS bm_bakery_db;
+USE bm_bakery_db;
+-- product_orgins refrenced last 
+CREATE TABLE product_orgins (
+	bp_id INT AUTO_INCREMENT,
+    prod_name VARCHAR(50) NOT NULL,
+    PRIMARY KEY (bp_id)
+);
+-- next reference up categories 
+CREATE TABLE categories (
+	cat_id INT AUTO_INCREMENT,
+    cat_name VARCHAR(50) NOT NULL,
+    bp_id INT NOT NULL,
+    PRIMARY KEY (cat_id),
+    CONSTRAINT fk_categories_product_orgins
+    FOREIGN KEY (bp_id) REFERENCES product_orgins (bp_id)
+);
+-- products, last in this fk chain
+CREATE TABLE products (
+	prod_id INT AUTO_INCREMENT,
+    cat_id INT NOT NULL,
+    prod_name VARCHAR(50),
+    prod_price DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+    PRIMARY KEY(prod_id),
+    CONSTRAINT products_pricecheck
+    CHECK (prod_price >= 0.00),
+    CONSTRAINT fk_products_categories
+    FOREIGN KEY (cat_id) REFERENCES categories(cat_id)
+);
+-- sales, final part for products 
+-- sale price brb
+CREATE TABLE sales (
+	sale_date DATE,
+    prod_id INT,
+    sale_quant INT NOT NULL,
+    CONSTRAINT fk_sales_products
+    FOREIGN KEY (prod_id) REFERENCES products(prod_id),
+    PRIMARY KEY (prod_id,sale_date),
+    CONSTRAINT sale_quant_check
+    CHECK (sale_quant > 0)
+);
+-- REF TABLE
+CREATE TABLE host_type(
+	host_id INT,
+    host_types VARCHAR(1),
+    PRIMARY KEY(host_id,host_types)
+);
+-- community 
+CREATE TABLE community (
+	id_community INT AUTO_INCREMENT,
+    community_type VARCHAR(20) NOT NULL,
+    community_name VARCHAR(50) NOT NULL,
+    community_city VARCHAR(50),
+    PRIMARY KEY (id_community),
+    CONSTRAINT chck_community_type
+    CHECK (community_type IN('organization','person')),
+    CONSTRAINT chck_community
+    UNIQUE (community_type,community_name,community_city)
+);
+-- school
+CREATE TABLE school (
+	id_school INT AUTO_INCREMENT,
+    school_name VARCHAR(100) NOT NULL,
+    school_level VARCHAR(10) NOT NULL,
+    school_city VARCHAR(20) NOT NULL,
+    PRIMARY KEY (id_school),
+    CONSTRAINT chck_school_level
+    CHECK (school_level IN ('middle','high','elementary','college')),
+    CONSTRAINT chck_school_name
+    UNIQUE (school_name,school_city,school_level)
+);
+-- local events
+CREATE TABLE local_events (
+	event_id INT AUTO_INCREMENT,
+    event_name VARCHAR(50) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    event_street VARCHAR(50) NOT NULL,
+	event_city VARCHAR(50) NOT NULL,
+    event_state VARCHAR(50) NOT NULL,
+    event_postal VARCHAR(50) NOT NULL,
+    host_type VARCHAR(1),
+    host_id INT,
+	PRIMARY KEY (event_id),
+    CONSTRAINT fk_local_events_host_types
+    FOREIGN KEY (host_id,host_type) REFERENCES host_type(host_id,host_types)
+);
