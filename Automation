@@ -1,0 +1,19 @@
+# Triggers:
+
+# Insert: 
+#Should validate sale quantity. Prevents a sale from being inserted with an invalid quantity.
+#Input is a sale record and output is a message that's returned when a record is rejected due to being less than 0.
+
+DELIMITER //
+
+CREATE TRIGGER trg_sales_insert_check
+  BEFORE INSERT ON sales
+  FOR EACH ROW
+BEGIN
+  IF NEW.sale_quantity <= 0 THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Sale quantity must be greater than 0.';
+  END IF;
+END //
+
+DELIMITER ;
