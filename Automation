@@ -68,3 +68,7 @@ BEGIN
 END //
 
 DELIMITER ;
+
+#Delete Ex:
+DELETE FROM products
+WHERE prod_code = 1;
