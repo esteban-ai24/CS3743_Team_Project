@@ -6,13 +6,64 @@
 
 DELIMITER //
 
-CREATE TRIGGER trg_sales_quantity_check
+CREATE TRIGGER trg_sales_quantity_insert
   BEFORE INSERT ON sales
   FOR EACH ROW
 BEGIN
   IF NEW.sale_quantity <= 0 THEN
     SIGNAL SQLSTATE '45000'
     SET MESSAGE_TEXT = 'Sale quantity must be greater than 0.';
+  END IF;
+END //
+
+DELIMITER ;
+
+#Insert Ex:
+INSERT INTO sales (sale_id, prod_code, sale_date, sale_quantity)
+VALUES (1001, 1, '2026-11-24', -4);
+
+#This record will be rejected because -4 is an invalid sale quantity.
+
+#Update:
+#Should enforce the rule that product prices do not change.
+#Input is OLD and NEW product records, and output is a message that's returned when a product price is rejected because it's trying to be changed/updated (when OLD != NEW).
+
+DELIMITER //
+
+CREATE TRIGGER trg_price_update
+  BEFORE UPDATE ON products
+  FOR EACH ROW
+BEGIN
+  IF NOT (NEW.prod_price <=> OLD.prod_price) THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Product prices cannot be changes.';
+  END IF;
+END //
+
+DELIMITER ;
+
+#Update Ex:
+UPDATE products
+SET prod_price = 5.99
+WHERE prod_code = 1;
+
+#Delete:
+#Should enforce any products that have existing sales. Helps maintain data consistency.
+#Input is the product record that's being deleted, and output is a message that's returned when a product is rejected because it currently has one or more sales in the sales table.
+
+DELIMITER //
+
+CREATE TRIGGER trg_product_delete
+  BEFORE DELETE ON products
+  FOR EACH ROW
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM sales
+    WHERE prod_code = OLD.prod_code
+  ) THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Cannot delete a product that has existing sales.';
   END IF;
 END //
 
