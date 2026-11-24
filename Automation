@@ -6,7 +6,7 @@
 
 DELIMITER //
 
-CREATE TRIGGER trg_sales_insert_check
+CREATE TRIGGER trg_sales_quantity_check
   BEFORE INSERT ON sales
   FOR EACH ROW
 BEGIN
