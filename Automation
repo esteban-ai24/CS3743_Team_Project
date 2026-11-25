@@ -1,8 +1,8 @@
-# Triggers:
+-- Triggers:
 
-# Insert: 
-#Should validate sale quantity. Prevents a sale from being inserted with an invalid quantity.
-#Input is a sale record and output is a message that's returned when a record is rejected due to being less than 0.
+-- Insert: 
+-- Should validate sale quantity. Prevents a sale from being inserted with an invalid quantity.
+-- Input is a sale record and output is a message that's returned when a record is rejected due to being less than 0.
 
 DELIMITER //
 
@@ -18,15 +18,15 @@ END //
 
 DELIMITER ;
 
-#Insert Ex:
+-- Insert Ex:
 INSERT INTO sales (sale_id, prod_code, sale_date, sale_quantity)
 VALUES (1001, 1, '2026-11-24', -4);
 
-#This record will be rejected because -4 is an invalid sale quantity.
+-- This record will be rejected because -4 is an invalid sale quantity.
 
-#Update:
-#Should enforce the rule that product prices do not change.
-#Input is OLD and NEW product records, and output is a message that's returned when a product price is rejected because it's trying to be changed/updated (when OLD != NEW).
+-- Update:
+-- Should enforce the rule that product prices do not change.
+-- Input is OLD and NEW product records, and output is a message that's returned when a product price is rejected because it's trying to be changed/updated (when OLD != NEW).
 
 DELIMITER //
 
@@ -42,14 +42,14 @@ END //
 
 DELIMITER ;
 
-#Update Ex:
+-- Update Ex:
 UPDATE products
 SET prod_price = 5.99
 WHERE prod_code = 1;
 
-#Delete:
-#Should enforce any products that have existing sales. Helps maintain data consistency.
-#Input is the product record that's being deleted, and output is a message that's returned when a product is rejected because it currently has one or more sales in the sales table.
+-- Delete:
+-- Should enforce any products that have existing sales. Helps maintain data consistency.
+-- Input is the product record that's being deleted, and output is a message that's returned when a product is rejected because it currently has one or more sales in the sales table.
 
 DELIMITER //
 
@@ -69,13 +69,13 @@ END //
 
 DELIMITER ;
 
-#Delete Ex:
+-- Delete Ex:
 DELETE FROM products
 WHERE prod_code = 1;
 
-#Delete - deleting sales
-#Should prevent deleting any sales that are refering to any event. 
-#Input is the sale record thats being deleted, and output is a message that's returned when a sale record deletion is rejected because it references an event.
+-- Delete - deleting sales
+-- Should prevent deleting any sales that are refering to any event. 
+-- Input is the sale record thats being deleted, and output is a message that's returned when a sale record deletion is rejected because it references an event.
 
 DELIMITER //
 
@@ -95,6 +95,6 @@ END //
 
 DELIMITER ;
 
-# Delete - Sale Ex:
+-- Delete - Sale Ex:
 DELETE FROM sales
 WHERE sale_id = 1;
