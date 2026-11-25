@@ -1,0 +1,92 @@
+--SQL QUERIES--
+
+--What product was the best seller over a month?
+-- 1. best selling product for each month
+SELECT current_product.sale_year, current_product.sale_month, current_product.prod_name,
+       current_product.units_sold, current_product.revenue
+FROM (
+    SELECT YEAR(sales.sale_date) AS sale_year, MONTH(sales.sale_date) AS sale_month, products.prod_name,
+           SUM(sales.sale_quantity) AS units_sold, SUM(sales.sale_quantity * products.prod_price) AS revenue
+    FROM sales
+    JOIN products ON sales.prod_code = products.prod_code
+    GROUP BY YEAR(sales.sale_date), MONTH(sales.sale_date), products.prod_name
+) AS current_product
+JOIN (
+    SELECT sale_year, sale_month, MAX(revenue) AS top_revenue
+    FROM (
+        SELECT YEAR(sales.sale_date) AS sale_year, MONTH(sales.sale_date) AS sale_month,
+               SUM(sales.sale_quantity * products.prod_price) AS revenue
+        FROM sales
+        JOIN products ON sales.prod_code = products.prod_code
+        GROUP BY YEAR(sales.sale_date), MONTH(sales.sale_date), products.prod_name
+    ) AS every_product
+    GROUP BY sale_year, sale_month
+) AS month_best
+  ON current_product.sale_year = month_best.sale_year
+ AND current_product.sale_month = month_best.sale_month
+ AND current_product.revenue = month_best.top_revenue
+ORDER BY current_product.sale_year, current_product.sale_month;
+
+
+--  2. How do one day event sales compare to the average of that day’s month? Day of week?
+SELECT event_totals.event_name, event_totals.event_day, event_totals.weekday,
+       event_totals.event_sales, month_averages.month_average,
+       event_totals.event_sales - month_averages.month_average AS difference
+FROM (
+    SELECT events.event_name, DATE(events.start_date) AS event_day, DAYNAME(events.start_date) AS weekday,
+           SUM(sales.sale_quantity * products.prod_price) AS event_sales
+    FROM events
+    JOIN sales ON events.event_id = sales.event_id
+    JOIN products ON sales.prod_code = products.prod_code
+    WHERE DATE(events.start_date) = DATE(events.end_date)
+    GROUP BY events.event_id, events.event_name, events.start_date
+) AS event_totals
+JOIN (
+    SELECT YEAR(sale_date) AS sale_year, MONTH(sale_date) AS sale_month,
+           ROUND(AVG(day_total), 2) AS month_average
+    FROM (
+        SELECT sales.sale_date, SUM(sales.sale_quantity * products.prod_price) AS day_total
+        FROM sales
+        JOIN products ON sales.prod_code = products.prod_code
+        GROUP BY sales.sale_date
+    ) AS daily_sales
+    GROUP BY YEAR(sale_date), MONTH(sale_date)
+) AS month_averages
+  ON YEAR(event_totals.event_day) = month_averages.sale_year
+ AND MONTH(event_totals.event_day) = month_averages.sale_month
+ORDER BY event_totals.event_day;
+
+
+-- 3. Based on a product’s category, what are the most popular/least popular products
+     
+SELECT product_totals.category_name, product_totals.prod_name, product_totals.units_sold,
+       CASE WHEN product_totals.units_sold = category_limits.most_sold
+            THEN 'Most popular' ELSE 'Least popular' END AS popularity
+FROM (
+    SELECT categories.category_name, products.prod_name, COALESCE(SUM(sales.sale_quantity), 0) AS units_sold
+    FROM products
+    JOIN categories ON products.category_id = categories.category_id
+    LEFT JOIN sales ON products.prod_code = sales.prod_code
+    GROUP BY categories.category_name, products.prod_name
+) AS product_totals
+JOIN (
+    SELECT category_name, MAX(units_sold) AS most_sold, MIN(units_sold) AS least_sold
+    FROM (
+        SELECT categories.category_name, products.prod_name, COALESCE(SUM(sales.sale_quantity), 0) AS units_sold
+        FROM products
+        JOIN categories ON products.category_id = categories.category_id
+        LEFT JOIN sales ON products.prod_code = sales.prod_code
+        GROUP BY categories.category_name, products.prod_name
+    ) AS every_product
+    GROUP BY category_name
+) AS category_limits
+  ON product_totals.category_name = category_limits.category_name
+WHERE product_totals.units_sold = category_limits.most_sold
+   OR product_totals.units_sold = category_limits.least_sold
+ORDER BY product_totals.category_name, product_totals.units_sold DESC;
+
+
+-- 4. 
+
+
+
