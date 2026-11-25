@@ -86,7 +86,44 @@ WHERE product_totals.units_sold = category_limits.most_sold
 ORDER BY product_totals.category_name, product_totals.units_sold DESC;
 
 
--- 4. 
+-- 4. How many school events comparend to community events
 
+SELECT CASE WHEN schools_events.event_id IS NOT NULL THEN 'School' ELSE 'Community' END AS event_type,
+       COUNT(DISTINCT events.event_id) AS number_of_events,
+       SUM(sales.sale_quantity * products.prod_price) AS total_sales,
+       ROUND(SUM(sales.sale_quantity * products.prod_price) / COUNT(DISTINCT events.event_id), 2) AS average_per_event
+FROM events
+JOIN sales ON events.event_id = sales.event_id
+JOIN products ON sales.prod_code = products.prod_code
+LEFT JOIN schools_events ON events.event_id = schools_events.event_id
+GROUP BY event_type;
+
+--  5. Which products were never sold
+SELECT products.prod_code, products.prod_name, products.prod_price
+FROM products
+WHERE products.prod_code NOT IN (SELECT sales.prod_code FROM sales);
+
+
+-- 6. What are the total sales per year? 
+SELECT YEAR(sales.sale_date) AS sale_year,
+       COUNT(DISTINCT sales.sale_date) AS days_with_sales,
+       SUM(sales.sale_quantity) AS units_sold,
+       SUM(sales.sale_quantity * products.prod_price) AS total_sales
+FROM sales
+JOIN products ON sales.prod_code = products.prod_code
+GROUP BY YEAR(sales.sale_date)
+ORDER BY sale_year;
+
+
+-- 7. What event made the most money?
+
+SELECT events.event_name, DATE(events.start_date) AS event_day, events.city,
+       SUM(sales.sale_quantity * products.prod_price) AS total_sales
+FROM events
+JOIN sales ON events.event_id = sales.event_id
+JOIN products ON sales.prod_code = products.prod_code
+GROUP BY events.event_id, events.event_name, events.start_date, events.city
+ORDER BY total_sales DESC
+LIMIT 1;
 
 
