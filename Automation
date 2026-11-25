@@ -86,7 +86,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM events
-    WHERE DATE(OLD.sale_date) BETWEEN DATE(start_date) AND DATE(end_date)
+    WHERE OLD.sale_date BETWEEN DATE(start_date) AND DATE(end_date)
   ) THEN 
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TXT = 'Cannot delete this sale because it refers to an event.'
