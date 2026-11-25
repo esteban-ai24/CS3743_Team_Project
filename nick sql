@@ -5,17 +5,21 @@ USE bakery_sales_db;
 -- Creating Product Origins table and setting bakery_part_id as PK
 -- Stores the physical section/station of the bakery where items are prepared
 CREATE TABLE product_origins (
-	bakery_part_id INT PRIMARY KEY,
-    bakery_part_name VARCHAR(100) NOT NULL UNIQUE
+	bakery_part_id INT,
+    bakery_part_name VARCHAR(100) NOT NULL,
+	PRIMARY KEY (bakery_part_id),
+	CONSTRAINT uq_bakery_part_name UNIQUE (bakery_part_name)
 );
 
 -- Creating Categories table 
 -- Stores specific item categories and links each to its bakery origin
 CREATE TABLE categories (
-	category_id INT PRIMARY KEY,
-    category_name VARCHAR(100) NOT NULL UNIQUE,
+	category_id INT,
+    category_name VARCHAR(100) NOT NULL,
     bakery_part_id INT NOT NULL,
-    CONSTRAINT fk_categories_origin
+    PRIMARY KEY (category_id),
+	CONSTRAINT UQ_category_name UNIQUE (category_name),
+	CONSTRAINT fk_categories_origin
 		FOREIGN KEY (bakery_part_id) REFERENCES product_origins(bakery_part_id)
         ON UPDATE CASCADE ON DELETE RESTRICT
 );
@@ -23,66 +27,74 @@ CREATE TABLE categories (
 -- Creating products table
 -- Stores individual bakery products derived from the Data
 CREATE TABLE products (
-	prod_code INT PRIMARY KEY,
-    prod_name VARCHAR(150) NOT NULL UNIQUE,
+    prod_code INT,
+    prod_name VARCHAR(150) NOT NULL,
     category_id INT NOT NULL,
-    prod_price DECIMAL(8,2) NOT NULL DEFAULT 0.00 CHECK (prod_price >=0),
+    prod_price DECIMAL(8,2) NOT NULL DEFAULT 0.00,
     last_update DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (prod_code),
+    CONSTRAINT uq_prod_name UNIQUE (prod_name),
+    CONSTRAINT chk_prod_price CHECK (prod_price >= 0),
     CONSTRAINT fk_products_category
-		FOREIGN KEY (category_id) REFERENCES categories(category_id)
+        FOREIGN KEY (category_id) REFERENCES categories(category_id)
         ON UPDATE CASCADE ON DELETE RESTRICT
-); 
+);
 
 -- Creating events table
 -- SuperType table storing all events (disjoint: either community or school)
 CREATE TABLE events (
-	event_id INT PRIMARY KEY,
-	event_name VARCHAR(15) NOT NULL,
-	start_date DATETIME NOT NULL,
-	end_date DATETIME NOT NULL,
-	street VARCHAR(150) NOT NULL,
-	city VARCHAR(100) NOT NULL,
-	state VARCHAR(2) NOT NULL DEFAULT 'TX',
-	postal_code VARCHAR(10) NOT NULL,
-	CONSTRAINT chk_event_dates CHECK (end_date >= start_date)
+    event_id INT,
+    event_name VARCHAR(15) NOT NULL,
+    start_date DATETIME NOT NULL,
+    end_date DATETIME NOT NULL,
+    street VARCHAR(150) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(2) NOT NULL DEFAULT 'TX',
+    postal_code VARCHAR(10) NOT NULL,
+    PRIMARY KEY (event_id),
+    CONSTRAINT chk_event_dates CHECK (end_date >= start_date)
 );
 
 -- Creating community_events table
 -- Subtype table for community events stores host name and host type
-CREATE TABLE community_events(
-	event_id INT PRIMARY KEY,
-	community_host_type VARCHAR(50) NOT NULL CHECK (community_host_type IN ('Person', 'Organization')),
-	community_host_name VARCHAR(150) NOT NULL,
-	CONSTRAINT fk_community_event
-		FOREIGN KEY (event_id) REFERENCES events(event_id)
-
-		ON UPDATE CASCADE ON DELETE CASCADE
+CREATE TABLE community_events (
+    event_id INT,
+    community_host_type VARCHAR(50) NOT NULL,
+    community_host_name VARCHAR(150) NOT NULL,
+    PRIMARY KEY (event_id),
+    CONSTRAINT chk_community_host_type CHECK (community_host_type IN ('Person', 'Organization')),
+    CONSTRAINT fk_community_event
+        FOREIGN KEY (event_id) REFERENCES events(event_id)
+        ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 -- Creating school_events table
 -- Subtype table for school events; stores the associated school name.
-CREATE TABLE schools_events(
-	event_id INT PRIMARY KEY,
-	school_name VARCHAR(150) NOT NULL,
-	CONSTRAINT fk_school_event
-		FOREIGN KEY (event_id) REFERENCES events(event_id)
-		ON UPDATE CASCADE ON DELETE CASCADE
+CREATE TABLE schools_events (
+    event_id INT,
+    school_name VARCHAR(150) NOT NULL,
+    PRIMARY KEY (event_id),
+    CONSTRAINT fk_school_event
+        FOREIGN KEY (event_id) REFERENCES events(event_id)
+        ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 -- Creating sales table
 -- Stores daily aggregated product sales, optionally linked to an event.
-CREATE TABLE sales(
-	sale_id INT PRIMARY KEY,
-	event_id INT NULL,
-	prod_code INT NOT NULL,
-	sale_date DATE NOT NULL,
-	sale_quantity INT NOT NULL DEFAULT 1 CHECK (sale_quantity > 0),
-	CONSTRAINT fk_sales_event
-		FOREIGN KEY (event_id) REFERENCES events(event_id)
-		ON UPDATE CASCADE ON DELETE SET NULL,
-	CONSTRAINT fk_sales_product
-		FOREIGN KEY (prod_code) REFERENCES products(prod_code)
-		ON UPDATE CASCADE ON DELETE RESTRICT
+CREATE TABLE sales (
+    sale_id INT,
+    event_id INT NULL,
+    prod_code INT NOT NULL,
+    sale_date DATE NOT NULL,
+    sale_quantity INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (sale_id),
+    CONSTRAINT chk_sale_quantity CHECK (sale_quantity > 0),
+    CONSTRAINT fk_sales_event
+        FOREIGN KEY (event_id) REFERENCES events(event_id)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_sales_product
+        FOREIGN KEY (prod_code) REFERENCES products(prod_code)
+        ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 
