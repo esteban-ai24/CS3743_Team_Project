@@ -1,0 +1,398 @@
+DROP DATABASE IF EXISTS bakery_sales_db;
+CREATE DATABASE bakery_sales_db;
+USE bakery_sales_db;
+
+-- Creating Product Origins table and setting bakery_part_id as PK
+-- Stores the physical section/station of the bakery where items are prepared
+CREATE TABLE product_origins (
+	bakery_part_id INT,
+    bakery_part_name VARCHAR(100) NOT NULL,
+	PRIMARY KEY (bakery_part_id),
+	CONSTRAINT uq_bakery_part_name UNIQUE (bakery_part_name)
+);
+
+-- Creating Categories table 
+-- Stores specific item categories and links each to its bakery origin
+CREATE TABLE categories (
+	category_id INT,
+    category_name VARCHAR(100) NOT NULL,
+    bakery_part_id INT NOT NULL,
+    PRIMARY KEY (category_id),
+	CONSTRAINT uq_category_name UNIQUE (category_name),
+	CONSTRAINT fk_categories_origin
+		FOREIGN KEY (bakery_part_id) REFERENCES product_origins(bakery_part_id)
+        ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Creating products table
+-- Stores individual bakery products derived from the Data
+CREATE TABLE products (
+    prod_code INT,
+    prod_name VARCHAR(150) NOT NULL,
+    category_id INT NOT NULL,
+    prod_price DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+    last_update DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (prod_code),
+    CONSTRAINT uq_prod_name UNIQUE (prod_name),
+    CONSTRAINT chk_prod_price CHECK (prod_price >= 0),
+    CONSTRAINT fk_products_category
+        FOREIGN KEY (category_id) REFERENCES categories(category_id)
+        ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Creating events table
+-- SuperType table storing all events (disjoint: either community or school)
+CREATE TABLE events (
+    event_id INT,
+    event_name VARCHAR(100) NOT NULL,
+    start_date DATETIME NOT NULL,
+    end_date DATETIME NOT NULL,
+    street VARCHAR(150) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(2) NOT NULL DEFAULT 'TX',
+    postal_code VARCHAR(10) NOT NULL,
+    PRIMARY KEY (event_id),
+    CONSTRAINT chk_event_dates CHECK (end_date >= start_date)
+);
+
+-- Creating community_events table
+-- Subtype table for community events stores host name and host type
+CREATE TABLE community_events (
+    event_id INT,
+    community_host_type VARCHAR(50) NOT NULL,
+    community_host_name VARCHAR(150) NOT NULL,
+    PRIMARY KEY (event_id),
+    CONSTRAINT chk_community_host_type CHECK (community_host_type IN ('Person', 'Organization')),
+    CONSTRAINT fk_community_event
+        FOREIGN KEY (event_id) REFERENCES events(event_id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+-- Creating schools_events table
+-- Subtype table for school events; stores the associated school name.
+CREATE TABLE schools_events (
+    event_id INT,
+    school_name VARCHAR(150) NOT NULL,
+    PRIMARY KEY (event_id),
+    CONSTRAINT fk_school_event
+        FOREIGN KEY (event_id) REFERENCES events(event_id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+-- Creating sales table
+-- Stores daily aggregated product sales, optionally linked to an event.
+CREATE TABLE sales (
+    sale_id INT,
+    prod_code INT NOT NULL,
+    sale_date DATE NOT NULL,
+    sale_quantity INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (sale_id),
+    CONSTRAINT chk_sale_quantity CHECK (sale_quantity > 0),
+    CONSTRAINT fk_sales_product
+        FOREIGN KEY (prod_code) REFERENCES products(prod_code)
+        ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+-- Triggers:
+
+-- Insert: 
+-- Should validate sale quantity. Prevents a sale from being inserted with an invalid quantity.
+-- Input is a sale record and output is a message that's returned when a record is rejected due to being less than 0.
+
+DELIMITER //
+
+CREATE TRIGGER trg_sales_quantity_insert
+  BEFORE INSERT ON sales
+  FOR EACH ROW
+BEGIN
+  IF NEW.sale_quantity <= 0 THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Sale quantity must be greater than 0.';
+  END IF;
+END //
+
+DELIMITER ;
+
+-- Insert Ex:
+/*INSERT INTO sales (sale_id, prod_code, sale_date, sale_quantity)
+VALUES (100, 1, '2026-11-24', -4);*/
+
+-- This record will be rejected because -4 is an invalid sale quantity.
+
+-- Update:
+-- Should enforce the rule that product prices do not change.
+-- Input is OLD and NEW product records, and output is a message that's returned when a product price is rejected because it's trying to be changed/updated (when OLD != NEW).
+
+DELIMITER //
+
+CREATE TRIGGER trg_price_update
+  BEFORE UPDATE ON products
+  FOR EACH ROW
+BEGIN
+  IF NOT (NEW.prod_price <=> OLD.prod_price) THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Product prices cannot be changes.';
+  END IF;
+END //
+
+DELIMITER ;
+
+-- Update Ex:
+/*UPDATE products
+SET prod_price = 5.99
+WHERE prod_code = 101;
+SELECT *
+FROM products;*/
+
+-- Delete:
+-- Should enforce any products that have existing sales. Helps maintain data consistency.
+-- Input is the product record that's being deleted, and output is a message that's returned when a product is rejected because it currently has one or more sales in the sales table.
+
+DELIMITER //
+
+CREATE TRIGGER trg_product_delete
+  BEFORE DELETE ON products
+  FOR EACH ROW
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM sales
+    WHERE prod_code = OLD.prod_code
+  ) THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Cannot delete a product that has existing sales.';
+  END IF;
+END //
+
+DELIMITER ;
+
+-- Delete Ex:
+/*DELETE FROM products
+WHERE prod_code = 101;*/
+
+-- Delete - deleting sales
+-- Should prevent deleting any sales that are refering to any event. 
+-- Input is the sale record thats being deleted, and output is a message that's returned when a sale record deletion is rejected because it references an event.
+
+DELIMITER //
+
+CREATE TRIGGER trg_event_sale_delete
+  BEFORE DELETE ON sales
+  FOR EACH ROW
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM events
+    WHERE OLD.sale_date BETWEEN DATE(start_date) AND DATE(end_date)
+  ) THEN 
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Cannot delete this sale because it refers to an event.';
+  END IF;
+END //
+
+DELIMITER ;
+
+-- Delete - Sale Ex:
+DELETE FROM products
+WHERE prod_code = 1;
+
+-- Data
+
+INSERT INTO product_origins (bakery_part_id, bakery_part_name)
+VALUES
+(1, 'Barista'),
+(2, 'Kitchen'),
+(3, 'Bakery');
+
+SELECT *
+FROM product_origins;
+
+INSERT INTO categories (category_id, category_name, bakery_part_id)
+VALUES
+(1, 'Drinks', 1),
+(2, 'Sandwiches', 2),
+(3, 'Pastries', 3),
+(4, 'Desserts', 3);
+SELECT *
+FROM categories;
+
+INSERT INTO products (prod_code, prod_name, category_id, prod_price)
+VALUES
+(101, 'Coffee', 1, 3.00),
+(102, 'Tea', 1, 2.50),
+(103, 'Latte', 1, 4.50),
+(104, 'Sandwich', 2, 7.00),
+(105, 'Bagel', 2, 3.50),
+(106, 'Croissant', 3, 3.25),
+(107, 'Muffin', 3, 3.75),
+(108, 'Cookie', 4, 2.00);
+SELECT *
+FROM products;
+
+INSERT INTO events
+(event_id, event_name, start_date, end_date,
+ street, city, state, postal_code)
+VALUES
+(201, 'School Fair', '2026-11-03 09:00:00', '2026-11-03 15:00:00',
+ '100 College St', 'San Antonio', 'TX', '78249'),
+
+(202, 'Food Festival', '2026-11-08 10:00:00', '2026-11-09 18:00:00',
+ '200 Main St', 'San Antonio', 'TX', '78205'),
+
+(203, 'Fall Carnival', '2026-11-15 10:00:00', '2026-11-15 16:00:00',
+ '300 Campus Dr', 'San Antonio', 'TX', '78229'),
+
+(204, 'Winter Market', '2026-12-05 08:00:00', '2026-12-05 17:00:00',
+ '400 Market St', 'San Antonio', 'TX', '78205'),
+
+(205, 'School Concert', '2026-12-12 18:00:00', '2026-12-12 21:00:00',
+ '500 University Ave', 'San Antonio', 'TX', '78249'),
+
+(206, 'Spring Fair', '2027-01-10 09:00:00', '2027-01-10 15:00:00',
+ '600 Park Rd', 'San Antonio', 'TX', '78230'),
+
+(207, 'Community Meetup', '2026-11-03 12:00:00', '2026-11-03 14:00:00',
+ '700 Oak St', 'San Antonio', 'TX', '78210');
+SELECT *
+FROM events;
+
+INSERT INTO schools_events (event_id, school_name)
+VALUES
+(201, 'UTSA'),
+(203, 'Northside High School'),
+(205, 'UTSA');
+SELECT *
+FROM schools_events;
+
+INSERT INTO community_events
+(event_id, community_host_type, community_host_name)
+VALUES
+(202, 'Organization', 'San Antonio Food Bank'),
+(204, 'Organization', 'Local Farmers Association'),
+(206, 'Person', 'John Smith'),
+(207, 'Person', 'Maria Garcia');
+SELECT *
+FROM community_events;
+
+INSERT INTO sales
+(sale_id, prod_code, sale_date, sale_quantity)
+VALUES
+(1, 101, '2026-11-03', 20),
+(2, 102, '2026-11-03', 10),
+(3, 104, '2026-11-03', 8),
+(4, 106, '2026-11-03', 12),
+(5, 101, '2026-11-04', 15),
+(6, 103, '2026-11-04', 8),
+(7, 105, '2026-11-04', 5),
+(8, 101, '2026-11-08', 30),
+(9, 107, '2026-11-08', 15),
+(10, 108, '2026-11-08', 20);
+SELECT *
+FROM sales;
+
+-- Procedure
+
+-- adding function to derive sale prices
+-- PROCEDURES add children to lookup table
+DELIMITER //
+CREATE PROCEDURE proc_add_host_id_host_types (IN in_host_id INT,
+IN in_host_types VARCHAR(1))
+BEGIN
+IF NOT((((SELECT COUNT(*) FROM school WHERE id_school = in_host_id) = 1) AND (in_host_types = 'S') OR 
+(SELECT COUNT(*) FROM community WHERE id_community = in_host_id) = 1) AND (in_host_types = 'C')) THEN
+	SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'Not valid pairing';
+END IF;
+IF(((SELECT COUNT(*) FROM school WHERE id_school = in_host_id) = 1) AND (in_host_types = 'S') ) THEN
+INSERT INTO host_type (host_id, host_types)
+VALUES (in_host_id, in_host_types);
+END IF;
+IF(((SELECT COUNT(*) FROM community WHERE id_community = in_host_id) = 1) AND (in_host_types = 'C') ) THEN
+INSERT INTO host_type (host_id, host_types)
+VALUES (in_host_id, in_host_types);
+END IF;
+END //
+DELIMITER ;
+
+-- Queries
+
+-- 1. best selling product for each month
+SELECT current_product.sale_year, current_product.sale_month, current_product.prod_name,
+       current_product.units_sold, current_product.revenue
+FROM (
+    SELECT YEAR(sales.sale_date) AS sale_year, MONTH(sales.sale_date) AS sale_month, products.prod_name,
+           SUM(sales.sale_quantity) AS units_sold, SUM(sales.sale_quantity * products.prod_price) AS revenue
+    FROM sales
+    JOIN products ON sales.prod_code = products.prod_code
+    GROUP BY YEAR(sales.sale_date), MONTH(sales.sale_date), products.prod_name
+) AS current_product
+JOIN (
+    SELECT sale_year, sale_month, MAX(revenue) AS top_revenue
+    FROM (
+        SELECT YEAR(sales.sale_date) AS sale_year, MONTH(sales.sale_date) AS sale_month,
+               SUM(sales.sale_quantity * products.prod_price) AS revenue
+        FROM sales
+        JOIN products ON sales.prod_code = products.prod_code
+        GROUP BY YEAR(sales.sale_date), MONTH(sales.sale_date), products.prod_name
+    ) AS every_product
+    GROUP BY sale_year, sale_month
+) AS month_best
+  ON current_product.sale_year = month_best.sale_year
+ AND current_product.sale_month = month_best.sale_month
+ AND current_product.revenue = month_best.top_revenue
+ORDER BY current_product.sale_year, current_product.sale_month;
+
+-- 2. Compares same day event sales to average of its month
+SELECT event_totals.event_name, event_totals.event_day, event_totals.weekday,
+       event_totals.event_sales, month_averages.month_average,
+       event_totals.event_sales - month_averages.month_average AS difference
+FROM (
+    SELECT events.event_id, events.event_name, DATE(events.start_date) AS event_day, DAYNAME(events.start_date) AS weekday,
+           SUM(sales.sale_quantity * products.prod_price) AS event_sales
+    FROM events
+    JOIN sales ON sales.sale_date = DATE(events.start_date)
+    JOIN products ON sales.prod_code = products.prod_code
+    WHERE DATE(events.start_date) = DATE(events.end_date)
+    GROUP BY events.event_id, events.event_name, events.start_date
+) AS event_totals
+JOIN (
+    SELECT YEAR(sale_date) AS sale_year, MONTH(sale_date) AS sale_month,
+           ROUND(AVG(day_total), 2) AS month_average
+    FROM (
+        SELECT sales.sale_date, SUM(sales.sale_quantity * products.prod_price) AS day_total
+        FROM sales
+        JOIN products ON sales.prod_code = products.prod_code
+        GROUP BY sales.sale_date
+    ) AS daily_sales
+    GROUP BY YEAR(sale_date), MONTH(sale_date)
+) AS month_averages
+  ON YEAR(event_totals.event_day) = month_averages.sale_year
+  AND MONTH(event_totals.event_day) = month_averages.sale_month
+ORDER BY event_totals.event_day;
+
+-- 3. Most popular and Least popular products
+SELECT product_totals.category_name, product_totals.prod_name, product_totals.units_sold,
+       CASE WHEN product_totals.units_sold = category_limits.most_sold
+            THEN 'Most popular' ELSE 'Least popular' END AS popularity
+FROM (
+    SELECT categories.category_name, products.prod_name, COALESCE(SUM(sales.sale_quantity), 0) AS units_sold
+    FROM products
+    JOIN categories ON products.category_id = categories.category_id
+    LEFT JOIN sales ON products.prod_code = sales.prod_code
+    GROUP BY categories.category_name, products.prod_name
+) AS product_totals
+JOIN (
+    SELECT category_name, MAX(units_sold) AS most_sold, MIN(units_sold) AS least_sold
+    FROM (
+        SELECT categories.category_name, products.prod_name, COALESCE(SUM(sales.sale_quantity), 0) AS units_sold
+        FROM products
+        JOIN categories ON products.category_id = categories.category_id
+        LEFT JOIN sales ON products.prod_code = sales.prod_code
+        GROUP BY categories.category_name, products.prod_name
+    ) AS every_product
+    GROUP BY category_name
+) AS category_limits
+  ON product_totals.category_name = category_limits.category_name
+WHERE product_totals.units_sold = category_limits.most_sold
+   OR product_totals.units_sold = category_limits.least_sold
+ORDER BY product_totals.units_sold DESC;
