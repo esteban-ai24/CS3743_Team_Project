@@ -1,0 +1,10 @@
+DROP PROCEDURE IF EXISTS proc_add_calc_saleprice;
+
+DELIMITER //
+CREATE PROCEDURE proc_add_calc_saleprice (IN in_prod_code INT, IN in_sale_quantity INT)
+BEGIN
+IF (SELECT COUNT(*) FROM products WHERE in_prod_code = prod_code) = 1
+THEN(SELECT prod_name,prod_price * in_sale_quantity AS sale_amnt,in_sale_quantity AS sale_quantity FROM products WHERE in_prod_code = prod_code);
+END IF;
+END //
+DELIMITER ;
