@@ -1,0 +1,30 @@
+-- 6. What are the total sales per year? 
+SELECT YEAR(sales.sale_date) AS sale_year,
+       COUNT(DISTINCT sales.sale_date) AS days_with_sales,
+       SUM(sales.sale_quantity) AS units_sold,
+       SUM(sales.sale_quantity * products.prod_price) AS total_sales
+FROM sales
+JOIN products ON sales.prod_code = products.prod_code
+GROUP BY YEAR(sales.sale_date)
+ORDER BY sale_year;
+
+
+-- 7. What one day event made the most money?
+
+SELECT 
+    events.event_name, 
+    DATE(events.start_date) AS event_day, 
+    events.city, 
+    SUM(sales.sale_quantity * products.prod_price) AS total_sales
+FROM events
+JOIN sales 
+    ON DATE(sales.sale_date) = DATE(events.start_date)
+JOIN products 
+    ON sales.prod_code = products.prod_code
+WHERE DATE(events.start_date) = DATE(events.end_date)
+GROUP BY 
+    events.event_name, 
+    DATE(events.start_date), 
+    events.city
+ORDER BY total_sales DESC
+LIMIT 1;
