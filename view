@@ -1,0 +1,16 @@
+DROP VIEW IF EXISTS bakery_sales_db.salesSummary;
+CREATE VIEW bakery_sales_db.salesSummary AS 
+SELECT 
+    DATE(sales.sale_date) AS sale_day,
+    products.prod_name,
+    SUM(products.prod_price * sales.sale_quantity) AS sale_amnt,
+    SUM(sales.sale_quantity) AS total_quantity
+FROM bakery_sales_db.products 
+JOIN bakery_sales_db.sales 
+    ON sales.prod_code = products.prod_code 
+GROUP BY 
+    DATE(sales.sale_date), 
+    products.prod_name
+ORDER BY 
+    sale_amnt DESC;
+SELECT * FROM salesSummary;
